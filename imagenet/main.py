@@ -186,6 +186,7 @@ def run_demo(demo_fn, world_size):
 if __name__ == "__main__":
     # n_gpus = torch.cuda.device_count()
     args = parser.parse_args()
+    best_acc1 = 0
 
     dist.init_process_group(
         backend="nccl",
@@ -209,18 +210,73 @@ if __name__ == "__main__":
         weight_decay=args.weight_decay,
     )
 
-    optimizer.zero_grad()
-    inputs = torch.randn(20, 10).to(gpu, non_blocking=True)
-    print(f"Input shape: {inputs.shape}")
-    outputs = ddp_model(inputs)
-    print(f"Output shape: {outputs.shape}")
-    labels = torch.randn(20, 5).to(gpu, non_blocking=True)
-    print(f"Labels shape: {labels.shape}")
-    criterion(outputs, labels).backward()
-    optimizer.step()
+    print("Adapt batch size")
+    batch_size = args.batch_size
+    batch_size_per_gpu = batch_size // idr_torch.size
 
-    print("Ending distributed training")
+    print("Data loading")
+    traindir = os.path.join(args.data, "train")
+    valdir = os.path.join(args.data, "val")
+    normalize = transforms.Normalize(
+        mean=[0.485, 0.456, 0.406],
+        std=[0.229, 0.224, 0.225],
+    )
+
+    train_dataset = datasets.ImageFolder(
+        traindir,
+        transforms.Compose(
+            [
+                transforms.RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(),
+                transforms.ToTensor(),
+                normalize,
+            ]
+        ),
+    )
+
+    train_sampler = torch.utils.data.distributed.DistributedSampler(
+        train_dataset, num_replicas=idr_torch.size, rank=idr_torch.rank
+    )
+
+    train_loader = torch.utils.data.DataLoader(
+        dataset=train_dataset,
+        batch_size=batch_size_per_gpu,
+        shuffle=False,
+        num_workers=0,
+        pin_memory=True,
+        sampler=train_sampler,
+    )
+
+    val_loader = torch.utils.data.DataLoader(
+        datasets.ImageFolder(
+            valdir,
+            transforms.Compose(
+                [
+                    transforms.Resize(256),
+                    transforms.CenterCrop(224),
+                    transforms.ToTensor(),
+                    normalize,
+                ]
+            ),
+        ),
+        batch_size=batch_size_per_gpu,
+        shuffle=False,
+        num_workers=0,
+        pin_memory=True,
+    )
+
     dist.destroy_process_group()
+    # optimizer.zero_grad()
+    # inputs = torch.randn(20, 10).to(gpu, non_blocking=True)
+    # print(f"Input shape: {inputs.shape}")
+    # outputs = ddp_model(inputs)
+    # print(f"Output shape: {outputs.shape}")
+    # labels = torch.randn(20, 5).to(gpu, non_blocking=True)
+    # print(f"Labels shape: {labels.shape}")
+    # criterion(outputs, labels).backward()
+    # optimizer.step()
+
+    # print("Ending distributed training")
 
     # if n_gpus < 4:
     #     print(f"Requries at least 4 GPUs to run, but got {n_gpus}")
