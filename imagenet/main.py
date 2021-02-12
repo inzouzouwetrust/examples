@@ -185,6 +185,7 @@ def run_demo(demo_fn, world_size):
 
 if __name__ == "__main__":
     # n_gpus = torch.cuda.device_count()
+    args = parser.parse_args()
 
     dist.init_process_group(
         backend="nccl",
@@ -196,12 +197,17 @@ if __name__ == "__main__":
     torch.cuda.set_device(idr_torch.local_rank)
     gpu = torch.device("cuda")
     print("Create model")
-    model = ToyModel().to(gpu)
+    model = models.__dict__[args.arch]().to(gpu)
     print("Model to DDP")
     ddp_model = DDP(model, device_ids=[idr_torch.local_rank])
 
-    loss_fn = nn.MSELoss()
-    optimizer = optim.SGD(ddp_model.parameters(), lr=0.001)
+    criterion = nn.CrossEntropyLoss()
+    optimizer = optim.SGD(
+        ddp_model.parameters(),
+        args.lr,
+        momentum=args.momentum,
+        weight_decay=args.weight_decay,
+    )
 
     optimizer.zero_grad()
     inputs = torch.randn(20, 10).to(gpu, non_blocking=True)
@@ -210,7 +216,7 @@ if __name__ == "__main__":
     print(f"Output shape: {outputs.shape}")
     labels = torch.randn(20, 5).to(gpu, non_blocking=True)
     print(f"Labels shape: {labels.shape}")
-    loss_fn(outputs, labels).backward()
+    criterion(outputs, labels).backward()
     optimizer.step()
 
     print("Ending distributed training")
