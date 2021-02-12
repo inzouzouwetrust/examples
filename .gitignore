@@ -1,3 +1,9 @@
+# slurm
+*.slurm
+*.stderr
+*.stdout
+
+
 dcgan/data
 data
 *.pyc
