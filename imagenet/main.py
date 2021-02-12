@@ -195,18 +195,25 @@ if __name__ == "__main__":
 
     torch.cuda.set_device(idr_torch.local_rank)
     gpu = torch.device("cuda")
+    print("Create model")
     model = ToyModel().to(gpu)
+    print("Model to DDP")
     ddp_model = DDP(model, device_ids=[idr_torch.local_rank])
 
     loss_fn = nn.MSELoss()
     optimizer = optim.SGD(ddp_model.parameters(), lr=0.001)
 
     optimizer.zero_grad()
-    outputs = ddp_model(torch.randn(20, 10).to(gpu, non_blocking=True))
+    inputs = torch.randn(20, 10).to(gpu, non_blocking=True)
+    print(f"Input shape: {inputs.shape}")
+    outputs = ddp_model(inputs)
+    print(f"Output shape: {outputs.shape}")
     labels = torch.randn(20, 5).to(gpu, non_blocking=True)
+    print(f"Labels shape: {labels.shape}")
     loss_fn(outputs, labels).backward()
     optimizer.step()
 
+    print("Ending distributed training")
     dist.destroy_process_group()
 
     # if n_gpus < 4:
