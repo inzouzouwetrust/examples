@@ -141,11 +141,7 @@ best_acc1 = 0
 
 def setup(rank, world_size):
     # initialize the process group
-    os.environ["MASTER_ADDR"] = "localhost"
-    os.environ["MASTER_PORT"] = "12355"
-    dist.init_process_group(
-        backend="nccl", init_method="env://", rank=rank, world_size=world_size
-    )
+    pass
 
 
 def cleanup():
@@ -188,12 +184,35 @@ def run_demo(demo_fn, world_size):
 
 
 if __name__ == "__main__":
-    n_gpus = torch.cuda.device_count()
+    # n_gpus = torch.cuda.device_count()
 
-    if n_gpus < 4:
-        print(f"Requries at least 4 GPUs to run, but got {n_gpus}")
-    else:
-        run_demo(demo_basic, 4)
+    dist.init_process_group(
+        backend="nccl",
+        init_method="env://",
+        rank=idr_torch.rank,
+        world_size=idr_torch.size,
+    )
+
+    torch.cuda.set_device(idr_torch.local_rank)
+    gpu = torch.device("cuda")
+    model = ToyModel().to(gpu)
+    ddp_model = DDP(model, device_ids=[idr_torch.local_rank])
+
+    loss_fn = nn.MSELoss()
+    optimizer = optim.SGD(ddp_model.parameters(), lr=0.001)
+
+    optimizer.zero_grad()
+    outputs = ddp_model(torch.randn(20, 10).to(gpu, non_blocking=True))
+    labels = torch.randn(20, 5).to(gpu, non_blocking=True)
+    loss_fn(outputs, labels).backward()
+    optimizer.step()
+
+    dist.destroy_process_group()
+
+    # if n_gpus < 4:
+    #     print(f"Requries at least 4 GPUs to run, but got {n_gpus}")
+    # else:
+    #     run_demo(demo_basic, 4)
 # def main():
 #     args = parser.parse_args()
 
