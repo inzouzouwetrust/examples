@@ -141,7 +141,9 @@ best_acc1 = 0
 
 def setup(rank, world_size):
     # initialize the process group
-    dist.init_process_group("nccl", rank=rank, world_size=world_size)
+    dist.init_process_group(
+        backend="nccl", init_method="env://", rank=rank, world_size=world_size
+    )
 
 
 def cleanup():
