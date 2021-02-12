@@ -1,5 +1,6 @@
 import argparse
 import os
+import pathlib
 import random
 import shutil
 import time
@@ -138,12 +139,25 @@ parser.add_argument(
 
 best_acc1 = 0
 
+JOBID = os.environ["SLURM_JOBID"]
+
 
 def adjust_learning_rate(optimizer, epoch, args):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
     lr = args.lr * (0.1 ** (epoch // 30))
     for param_group in optimizer.param_groups:
         param_group["lr"] = lr
+
+
+def save_checkpoint(state, is_best, filename="checkpoint.pt"):
+    base = os.path.join("./data/runs/", JOBID)
+    pathlib.Path(base).mkdir(parents=True, exist_ok=True)
+    filename = os.path.join(base, filename)
+    best_path = os.path.join(base, "model_best.pt")
+
+    torch.save(state, filename)
+    if is_best:
+        shutil.copyfile(filename, best_path)
 
 
 if __name__ == "__main__":
@@ -227,6 +241,20 @@ if __name__ == "__main__":
         num_workers=0,
         pin_memory=True,
     )
+
+    # TODO Save initial model
+    if idr_torch.rank == 0:
+        print("Saving initial model")
+        save_checkpoint(
+            {
+                "epoch": args.start_epoch,
+                "arch": args.arch,
+                "state_dict": ddp_model.state_dict(),
+                "best_acc1": best_acc1,
+                "optimizer": optimizer.state_dict(),
+            },
+            False,
+        )
 
     # Training loop
     for epoch in range(args.start_epoch, args.epochs):
