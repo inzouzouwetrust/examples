@@ -265,6 +265,8 @@ if __name__ == "__main__":
         pin_memory=True,
     )
 
+    print("Exit distributed")
+
     dist.destroy_process_group()
     # optimizer.zero_grad()
     # inputs = torch.randn(20, 10).to(gpu, non_blocking=True)
