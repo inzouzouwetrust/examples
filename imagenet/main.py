@@ -36,7 +36,7 @@ parser.add_argument(
 parser.add_argument(
     "-j",
     "--workers",
-    default=4,
+    default=40,
     type=int,
     metavar="N",
     help="number of data loading workers (default: 4)",
@@ -334,6 +334,7 @@ if __name__ == "__main__":
     print("Adapt batch size")
     batch_size = args.batch_size
     batch_size_per_gpu = batch_size // idr_torch.size
+    workers_per_gpu = (args.workers + idr_torch.size - 1) // idr_torch.size
 
     print("Data loading")
     traindir = os.path.join(args.data, "train")
@@ -363,7 +364,7 @@ if __name__ == "__main__":
         dataset=train_dataset,
         batch_size=batch_size_per_gpu,
         shuffle=False,
-        num_workers=0,
+        num_workers=workers_per_gpu,
         pin_memory=True,
         sampler=train_sampler,
     )
@@ -382,7 +383,7 @@ if __name__ == "__main__":
         ),
         batch_size=batch_size_per_gpu,
         shuffle=False,
-        num_workers=0,
+        num_workers=workers_per_gpu,
         pin_memory=True,
     )
 
