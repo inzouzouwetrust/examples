@@ -83,7 +83,7 @@ parser.add_argument(
 parser.add_argument(
     "-p",
     "--print-freq",
-    default=10,
+    default=500,
     type=int,
     metavar="N",
     help="print frequency (default: 10)",
